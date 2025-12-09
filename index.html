@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Flood Alert System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #eef;
+            padding: 20px;
+        }
+        button {
+            padding: 10px;
+            margin: 8px 0;
+            width: 100%;
+            max-width: 300px;
+            font-weight: bold;
+        }
+        #alertBox {
+            margin-top: 20px;
+            padding: 15px;
+            font-weight: bold;
+            display: none;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .low { background-color: #d4edda; color: #155724; }
+        .moderate { background-color: #fff3cd; color: #856404; }
+        .high { background-color: #f8d7da; color: #721c24; }
+        iframe {
+            width: 100%;
+            height: 300px;
+            border: none;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Flood Alert System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #eef;
+            padding: 20px;
+        }
+        button {
+            padding: 10px;
+            margin: 8px 0;
+            width: 100%;
+            max-width: 300px;
+            font-weight: bold;
+        }
+        #alertBox {
+            margin-top: 20px;
+            padding: 15px;
+            font-weight: bold;
+            display: none;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .low { background-color: #d4edda; color: #155724; }
+        .moderate { background-color: #fff3cd; color: #856404; }
+        .high { background-color: #f8d7da; color: #721c24; }
+        iframe {
+            width: 100%;
+            height: 300px;
+            border: none;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h2>🌊 Realtime Flood Alert System</h2>
+
+    <button id="checkRisk">Check Flood Risk (Use My Location)</button>
+    <div id="alertBox"></div>
+    <div id="mapContainer"></div>
+
+    <script>
+        document.getElementById('checkRisk').addEventListener('click', function () {
+            if (!navigator.geolocation) {
+                alert("Geolocation is not supported by your browser.");
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(async function (position) {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+
+                // Get location name from OpenStreetMap
+                let locationName = "Unknown";
+                try {
+                    const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`);
+                    const geoData = await geoRes.json();
+                    locationName = geoData.display_name || "Unknown location";
+                } catch (error) {
+                    console.warn("Could not fetch location name.");
+                }
+
+                // Send coordinates to Flask
+                fetch('/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ lat, lon })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const alertBox = document.getElementById('alertBox');
+                    alertBox.style.display = 'block';
+
+                    // Apply color class
+                    if (data.risk_level === 'Low') {
+                        alertBox.className = 'low';
+                    } else if (data.risk_level === 'Moderate') {
+                        alertBox.className = 'moderate';
+                    } else {
+                        alertBox.className = 'high';
+
+                        // 🔊 Sound Alert
+                        const audio = new Audio("https://www.soundjay.com/button/beep-07.wav");
+                        audio.play();
+
+                        // 📳 Vibration Alert
+                        if (navigator.vibrate) {
+                            navigator.vibrate([500, 300, 500]);
+                        }
+                    }
+
+                    alertBox.innerHTML = `
+                        📍 <strong>Location:</strong> ${locationName}<br>
+                        🔢 <strong>Flood Probability:</strong> ${data.probability}<br>
+                        ⚠️ <strong>Risk Level:</strong> ${data.risk_level}<br>
+                        🛟 <strong>Safety Tip:</strong> ${data.safety_tip}<br><br>
+                        🌡️ <strong>Temperature:</strong> ${data.temperature} °C<br>
+                        💧 <strong>Humidity:</strong> ${data.humidity} %<br>
+                        🌧️ <strong>Rainfall:</strong> ${data.rainfall} mm (1h)<br>
+                        🌥️ <strong>Weather:</strong> ${data.weather_condition}
+                    `;
+
+                    document.getElementById('mapContainer').innerHTML = `
+                        <iframe
+                            src="https://maps.google.com/maps?q=${lat},${lon}&z=14&output=embed"
+                            allowfullscreen>
+                        </iframe>
+                    `;
+                })
+                .catch(err => {
+                    alert("Error contacting server.");
+                    console.error(err);
+                });
+
+            }, function () {
+                alert("Unable to retrieve your location.");
+            });
+        });
+    </script>
+</body>
+</html>
+
